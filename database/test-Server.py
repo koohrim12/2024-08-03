@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import sqlite3
@@ -21,9 +22,32 @@ def get_db_connection():
     print("Database 연결 확인")  # 데이터베이스 연결 확인 메시지 출력
     return conn
 
+# 중복 데이터 삭제 함수
+def delete_duplicate_users():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # 중복된 데이터를 삭제
+        cursor.execute("""
+            DELETE FROM users
+            WHERE id NOT IN (
+                SELECT MIN(id)
+                FROM users
+                GROUP BY name, age
+            );
+        """)
+        conn.commit()
+        print("중복된 데이터 삭제 완료")
+    except sqlite3.Error as e:
+        print(f"중복 데이터 삭제 실패: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+        print("Database 연결 종료")  # 데이터베이스 연결 종료 확인 메시지 출력
+
 # 검색 API 엔드포인트
 @app.get("/search")
-def search(query:str):
+def search(query: str):
     if not query:
         print("Query parameter is missing")  # 쿼리 매개변수 확인 메시지 출력
         raise HTTPException(status_code=400, detail="Query parameter is required")
@@ -32,7 +56,12 @@ def search(query:str):
     try:
         cursor = conn.cursor()
         query = query.lower()  # 검색어를 소문자로 변환
-        cursor.execute("SELECT name, age FROM users WHERE LOWER(name) OR age LIKE ?", (f'%{query}%',))
+        # name 또는 age와 일치하는 모든 항목을 검색하도록 쿼리 수정
+        cursor.execute("""
+            SELECT name, age 
+            FROM users 
+            WHERE LOWER(name) LIKE ? OR CAST(age AS TEXT) LIKE ?
+        """, (f'%{query}%', f'%{query}%'))
         rows = cursor.fetchall()
         results = [{"name": row["name"], "age": row["age"]} for row in rows]
         print(f"Search results for query '{query}': {results}")  # 검색 결과 확인 메시지 출력
@@ -49,8 +78,11 @@ def search(query:str):
 # 서버 시작
 if __name__ == "__main__":
     import uvicorn
+    # 중복 데이터 삭제
+    delete_duplicate_users()
     print("Starting server on http://localhost:3001")  # 서버 시작 메시지 출력
     uvicorn.run(app, host="0.0.0.0", port=3001)
+
 
 
 
