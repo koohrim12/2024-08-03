@@ -2,12 +2,11 @@
 
 import Image from 'next/image';
 
-import LoginFormSection from './ui/loginFormSection/loginFormSection';
-
+import SearchComponent from './lib/SearchComponent';
 export default function Home() {
   return (
     <>
-      <LoginFormSection />
+      <SearchComponent />
     </>
   );
 }
